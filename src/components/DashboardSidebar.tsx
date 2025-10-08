@@ -1,0 +1,58 @@
+import { NavLink } from "react-router-dom";
+import { LayoutDashboard, DollarSign, BarChart3, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const DashboardSidebar = () => {
+  const navItems = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+    { title: "Monetize", url: "/monetize", icon: DollarSign },
+  ];
+
+  const handleLogout = () => {
+    // TODO: Implement actual logout
+    window.location.href = "/";
+  };
+
+  return (
+    <aside className="w-64 min-h-screen bg-card border-r border-border p-6 flex flex-col">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="p-2 bg-gradient-to-br from-primary to-accent rounded-xl">
+          <BarChart3 className="h-6 w-6 text-white" />
+        </div>
+        <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          Analytics Pro
+        </h1>
+      </div>
+
+      <nav className="flex-1 space-y-2">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.title}
+            to={item.url}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`
+            }
+          >
+            <item.icon className="h-5 w-5" />
+            <span className="font-medium">{item.title}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      <Button
+        variant="outline"
+        className="w-full justify-start gap-3"
+        onClick={handleLogout}
+      >
+        <LogOut className="h-5 w-5" />
+        <span>Logout</span>
+      </Button>
+    </aside>
+  );
+};
+
+export default DashboardSidebar;
