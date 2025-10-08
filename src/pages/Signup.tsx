@@ -20,16 +20,17 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/10 p-4">
-      <Card className="w-full max-w-md shadow-elegant animate-fade-up">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-accent/20 animate-glow" />
+      <Card className="w-full max-w-md animate-fade-up relative border-border" style={{ boxShadow: 'var(--shadow-elegant)' }}>
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-gradient-to-br from-primary to-accent rounded-2xl">
+            <div className="p-3 bg-gradient-to-br from-primary to-accent rounded-2xl shadow-lg animate-glow" style={{ boxShadow: 'var(--shadow-glow)' }}>
               <BarChart3 className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Get started with your analytics dashboard</CardDescription>
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Create Account</CardTitle>
+          <CardDescription>Start monetizing with AutoMonetize AI</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="space-y-4">
@@ -66,7 +67,7 @@ const Signup = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity">
+            <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 hover:scale-[1.02] shadow-lg" style={{ boxShadow: 'var(--shadow-glow)' }}>
               Create Account
             </Button>
             <div className="text-center text-sm text-muted-foreground">
