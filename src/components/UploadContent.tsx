@@ -27,6 +27,11 @@ const UploadContent = () => {
     const savedWebhook = localStorage.getItem("n8n_webhook_url");
     if (savedWebhook) {
       setWebhookUrl(savedWebhook);
+    } else {
+      // Set default webhook URL
+      const defaultWebhook = "http://localhost:5678/webhook/4700b78a-8cd8-4e77-a65c-fe473adddfba";
+      setWebhookUrl(defaultWebhook);
+      localStorage.setItem("n8n_webhook_url", defaultWebhook);
     }
   }, []);
 
