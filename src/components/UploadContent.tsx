@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
-import { Upload, File, X } from "lucide-react";
+import { useState, useRef } from "react";
+import { Upload, File, X, Video, ExternalLink, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface UploadedFile {
@@ -19,29 +18,9 @@ const UploadContent = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [description, setDescription] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [isWebhookLoading, setIsWebhookLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load webhook URL from localStorage
-  useEffect(() => {
-    const savedWebhook = localStorage.getItem("n8n_webhook_url");
-    if (savedWebhook) {
-      setWebhookUrl(savedWebhook);
-    } else {
-      // Set default webhook URL
-      const defaultWebhook = "http://localhost:5678/webhook/4700b78a-8cd8-4e77-a65c-fe473adddfba";
-      setWebhookUrl(defaultWebhook);
-      localStorage.setItem("n8n_webhook_url", defaultWebhook);
-    }
-  }, []);
-
-  // Save webhook URL to localStorage
-  const handleWebhookUrlChange = (url: string) => {
-    setWebhookUrl(url);
-    localStorage.setItem("n8n_webhook_url", url);
-  };
-
-  const handleFileUpload = async (selectedFiles: FileList | null) => {
+  const handleFileUpload = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
     const newFiles: UploadedFile[] = Array.from(selectedFiles).map((file) => ({
@@ -55,38 +34,6 @@ const UploadContent = () => {
     setFiles([...files, ...newFiles]);
     setDescription("");
     toast.success(`${newFiles.length} file(s) uploaded successfully!`);
-
-    // Send to n8n webhook if configured
-    if (webhookUrl) {
-      setIsWebhookLoading(true);
-      try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          mode: "no-cors",
-          body: JSON.stringify({
-            files: newFiles.map(f => ({
-              id: f.id,
-              name: f.name,
-              size: f.size,
-              description: f.description,
-              uploadedAt: f.uploadedAt.toISOString(),
-            })),
-            timestamp: new Date().toISOString(),
-            source: "content-upload",
-          }),
-        });
-        
-        toast.success("Content sent to n8n workflow!");
-      } catch (error) {
-        console.error("Error sending to n8n webhook:", error);
-        toast.error("Failed to send to n8n workflow");
-      } finally {
-        setIsWebhookLoading(false);
-      }
-    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -119,6 +66,7 @@ const UploadContent = () => {
 
   return (
     <div className="space-y-6 animate-fade-up">
+      {/* Section 1: File Upload */}
       <Card className="border-border bg-gradient-to-br from-card to-card/50 backdrop-blur-sm" style={{ boxShadow: 'var(--shadow-card)' }}>
         <CardHeader>
           <CardTitle className="text-2xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -129,23 +77,6 @@ const UploadContent = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <Label htmlFor="webhook-url" className="text-sm font-medium">
-              n8n Webhook URL
-            </Label>
-            <Input
-              id="webhook-url"
-              type="url"
-              placeholder="https://your-n8n-instance.com/webhook/..."
-              value={webhookUrl}
-              onChange={(e) => handleWebhookUrlChange(e.target.value)}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Uploads will automatically trigger your n8n workflow when configured
-            </p>
-          </div>
-
           <div
             className={`border-2 border-dashed rounded-lg p-12 text-center transition-all duration-300 ${
               isDragging
@@ -167,17 +98,16 @@ const UploadContent = () => {
               onChange={(e) => handleFileUpload(e.target.files)}
               className="hidden"
               id="file-upload"
+              ref={fileInputRef}
             />
-            <label htmlFor="file-upload">
-              <Button 
-                variant="outline" 
-                className="cursor-pointer" 
-                disabled={isWebhookLoading}
-                asChild
-              >
-                <span>{isWebhookLoading ? "Processing..." : "Choose Files"}</span>
-              </Button>
-            </label>
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+            >
+              Choose Files
+            </Button>
           </div>
 
           <div className="space-y-3">
@@ -189,6 +119,58 @@ const UploadContent = () => {
               className="resize-none transition-all duration-300 focus:scale-[1.02]"
               rows={3}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 2: Blotato Creative Section */}
+      <Card className="border-border bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-orange-500/10 backdrop-blur-sm relative overflow-hidden group" style={{ boxShadow: 'var(--shadow-card)' }}>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-accent/10 to-primary/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+        
+        <CardHeader className="relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <CardTitle className="text-2xl bg-gradient-to-r from-primary via-purple-500 to-accent bg-clip-text text-transparent">
+              Explore Blotato
+            </CardTitle>
+          </div>
+          <CardDescription className="text-base">
+            Discover and manage your video content with Blotato's powerful platform
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="relative z-10 space-y-6">
+          <div className="flex flex-col items-center justify-center p-8 rounded-lg bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-sm border border-border/50">
+            <div className="mb-6 relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-full blur-xl opacity-50 animate-pulse" />
+              <div className="relative p-6 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border-2 border-primary/30">
+                <Video className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Your Video Hub Awaits
+            </h3>
+            <p className="text-sm text-muted-foreground text-center mb-6 max-w-md">
+              Access your video library, manage content, and unlock new monetization opportunities with Blotato's intuitive platform.
+            </p>
+            
+            <Button
+              onClick={() => window.open("https://my.blotato.com/videos", "_blank")}
+              className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-lg group/btn relative overflow-hidden"
+              style={{ boxShadow: 'var(--shadow-glow)' }}
+              size="lg"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                <span>Visit Blotato</span>
+                <ExternalLink className="h-4 w-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform duration-300" />
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-accent to-primary opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300" />
+            </Button>
           </div>
         </CardContent>
       </Card>
