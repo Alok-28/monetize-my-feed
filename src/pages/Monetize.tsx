@@ -1,31 +1,141 @@
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { DollarSign, TrendingUp, ShoppingBag, CreditCard } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Users, Eye, Heart, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { getInstagramAnalytics } from "@/utils/instagramApi";
 
-const revenueData = [
-  { month: "Jan", revenue: 4200, sponsored: 2100 },
-  { month: "Feb", revenue: 5800, sponsored: 2800 },
-  { month: "Mar", revenue: 7200, sponsored: 3500 },
-  { month: "Apr", revenue: 6800, sponsored: 3200 },
-  { month: "May", revenue: 8900, sponsored: 4100 },
-  { month: "Jun", revenue: 9500, sponsored: 4500 },
-];
+const INSTAGRAM_ACCESS_TOKEN = "IGAAqizzrqLQFBZAFJMcktiemtiVnJ5UU5tUWRIa3UxNFRNcGlfTnhzUXpZAVFZAkTHJudHdPWHVsUlVtNDBJR1lLckFlUkZATOUsyaURleWtqQ2FPUENSN1VzYmppR0pqTThrTzV0VnBnNGhHZAnN4SDQza3h0Ymw0bW1ubk9Pa3RBdwZDZD";
 
-const platformRevenue = [
-  { name: "Instagram", value: 45000 },
-  { name: "YouTube", value: 38000 },
-  { name: "TikTok", value: 28000 },
-  { name: "Twitter", value: 15000 },
-];
+interface InstagramStats {
+  followers: number;
+  impressions: number;
+  reach: number;
+  engagement: number;
+  totalLikes: number;
+  totalComments: number;
+  profileViews: number;
+}
 
 const Monetize = () => {
+  const [instagramData, setInstagramData] = useState<InstagramStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [revenueData, setRevenueData] = useState([
+    { month: "Jan", revenue: 0, engagement: 0 },
+    { month: "Feb", revenue: 0, engagement: 0 },
+    { month: "Mar", revenue: 0, engagement: 0 },
+    { month: "Apr", revenue: 0, engagement: 0 },
+    { month: "May", revenue: 0, engagement: 0 },
+    { month: "Jun", revenue: 0, engagement: 0 },
+  ]);
+  const [mediaData, setMediaData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchInstagramData = async () => {
+      try {
+        setLoading(true);
+        const analytics = await getInstagramAnalytics(INSTAGRAM_ACCESS_TOKEN);
+        
+        // Calculate total engagement from media (likes + comments)
+        const totalLikes = analytics.media.reduce((sum, m) => sum + (m.like_count || 0), 0);
+        const totalComments = analytics.media.reduce((sum, m) => sum + (m.comments_count || 0), 0);
+        const totalEngagement = totalLikes + totalComments;
+        
+        // Calculate estimated revenue (example: $0.01 per engagement)
+        const estimatedRevenue = Math.round(totalEngagement * 0.01);
+        
+        // Calculate total impressions from media
+        const totalImpressions = analytics.media.reduce((sum, m) => sum + (m.impressions || 0), 0);
+        
+        setInstagramData({
+          followers: analytics.account.followers_count || analytics.insights.follower_count || 0,
+          impressions: totalImpressions || analytics.insights.total_interactions || 0,
+          reach: analytics.insights.reach || 0,
+          engagement: totalEngagement,
+          totalLikes,
+          totalComments,
+          profileViews: analytics.insights.profile_views || 0,
+        });
+
+        // Update revenue data with estimated values
+        const monthlyData = revenueData.map((month, index) => ({
+          ...month,
+          revenue: Math.round(estimatedRevenue * (0.8 + index * 0.05)),
+          engagement: Math.round(totalEngagement * (0.7 + index * 0.05)),
+        }));
+        setRevenueData(monthlyData);
+
+        // Set media data for transactions
+        setMediaData(analytics.media.slice(0, 5));
+      } catch (err: any) {
+        console.error("Error fetching Instagram data:", err);
+        setError(err.message || "Failed to fetch Instagram analytics");
+        // Set default values on error
+        setInstagramData({
+          followers: 0,
+          impressions: 0,
+          reach: 0,
+          engagement: 0,
+          totalLikes: 0,
+          totalComments: 0,
+          profileViews: 0,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInstagramData();
+  }, []);
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`;
+    return `$${num.toLocaleString()}`;
+  };
+
+  const formatCount = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toLocaleString();
+  };
+
+  const estimatedRevenue = instagramData ? Math.round(instagramData.engagement * 0.01) : 0;
+  const avgPerPost = mediaData.length > 0 ? Math.round(estimatedRevenue / mediaData.length) : 0;
+  const estimatedProducts = Math.round(instagramData?.engagement || 0 / 100);
+  const estimatedSponsorships = Math.round((instagramData?.followers || 0) / 1000);
+
   const stats = [
-    { title: "Total Revenue", value: "$126,450", change: "+23.1%", icon: DollarSign, color: "from-green-500 to-emerald-500" },
-    { title: "Avg. Per Post", value: "$1,240", change: "+8.2%", icon: TrendingUp, color: "from-blue-500 to-cyan-500" },
-    { title: "Products Sold", value: "2,340", change: "+15.3%", icon: ShoppingBag, color: "from-purple-500 to-pink-500" },
-    { title: "Sponsorships", value: "28", change: "+12.0%", icon: CreditCard, color: "from-orange-500 to-red-500" },
+    { 
+      title: "Total Revenue", 
+      value: formatNumber(estimatedRevenue), 
+      change: "+23.1%", 
+      icon: DollarSign, 
+      color: "from-green-500 to-emerald-500" 
+    },
+    { 
+      title: "Avg. Per Post", 
+      value: formatNumber(avgPerPost), 
+      change: "+8.2%", 
+      icon: TrendingUp, 
+      color: "from-blue-500 to-cyan-500" 
+    },
+    { 
+      title: "Total Engagement", 
+      value: formatCount(instagramData?.engagement || 0), 
+      change: "+15.3%", 
+      icon: Heart, 
+      color: "from-purple-500 to-pink-500" 
+    },
+    { 
+      title: "Followers", 
+      value: formatCount(instagramData?.followers || 0), 
+      change: "+12.0%", 
+      icon: Users, 
+      color: "from-orange-500 to-red-500" 
+    },
   ];
 
   return (
@@ -35,8 +145,8 @@ const Monetize = () => {
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex justify-between items-center animate-fade-in">
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Monetization</h1>
-              <p className="text-muted-foreground">Track your earnings and revenue streams</p>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Instagram Monetization</h1>
+              <p className="text-muted-foreground">Track your Instagram earnings and revenue streams</p>
             </div>
             <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-lg" style={{ boxShadow: 'var(--shadow-glow)' }}>
               View Payouts
@@ -63,109 +173,170 @@ const Monetize = () => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-up">
+          {loading && (
             <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-              <CardHeader>
-                <CardTitle className="text-xl">Revenue Trend</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="sponsored" 
-                      stroke="hsl(var(--accent))" 
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--accent))", r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">Loading Instagram analytics...</p>
               </CardContent>
             </Card>
+          )}
 
+          {error && (
             <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-              <CardHeader>
-                <CardTitle className="text-xl">Platform Revenue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={platformRevenue}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="name" className="text-xs" />
-                    <YAxis className="text-xs" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <CardContent className="p-6 text-center">
+                <p className="text-destructive">Error: {error}</p>
               </CardContent>
             </Card>
-          </div>
+          )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fade-up">
-            <Card className="lg:col-span-2 border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-              <CardHeader>
-                <CardTitle className="text-xl">Recent Transactions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { type: "Sponsored Post", platform: "Instagram", amount: "$2,400", date: "Today" },
-                    { type: "Affiliate Sales", platform: "YouTube", amount: "$1,850", date: "Yesterday" },
-                    { type: "Brand Deal", platform: "TikTok", amount: "$5,000", date: "2 days ago" },
-                    { type: "Product Launch", platform: "Instagram", amount: "$8,200", date: "3 days ago" },
-                    { type: "Sponsored Video", platform: "YouTube", amount: "$3,500", date: "5 days ago" },
-                  ].map((transaction, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-all duration-300 hover:scale-[1.02] animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{transaction.type}</span>
-                        <span className="text-sm text-muted-foreground">{transaction.platform} · {transaction.date}</span>
-                      </div>
-                      <span className="text-lg font-bold text-green-500">{transaction.amount}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          {!loading && !error && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-up">
+                <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
+                  <CardHeader>
+                    <CardTitle className="text-xl">Instagram Revenue Trend</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={revenueData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stroke="hsl(var(--primary))" 
+                          strokeWidth={2}
+                          dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="engagement" 
+                          stroke="hsl(var(--accent))" 
+                          strokeWidth={2}
+                          dot={{ fill: "hsl(var(--accent))", r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
 
-            <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-              <CardHeader>
-                <CardTitle className="text-xl">Revenue Sources</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[
-                  { source: "Sponsored Content", percentage: 45, amount: "$56,800" },
-                  { source: "Affiliate Marketing", percentage: 30, amount: "$37,900" },
-                  { source: "Product Sales", percentage: 15, amount: "$18,950" },
-                  { source: "Ad Revenue", percentage: 10, amount: "$12,650" },
-                ].map((item, index) => (
-                  <div key={index} className="space-y-2 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">{item.source}</span>
-                      <span className="text-muted-foreground">{item.percentage}%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-700 hover:scale-105"
-                        style={{ width: `${item.percentage}%` }}
-                      />
-                    </div>
-                    <div className="text-xs text-muted-foreground">{item.amount}</div>
+                <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
+                  <CardHeader>
+                    <CardTitle className="text-xl">Instagram Performance Metrics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={[
+                        { name: "Impressions", value: instagramData?.impressions || 0 },
+                        { name: "Reach", value: instagramData?.reach || 0 },
+                        { name: "Engagement", value: instagramData?.engagement || 0 },
+                        { name: "Profile Views", value: instagramData?.profileViews || 0 },
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="name" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+
+          {!loading && !error && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fade-up">
+              <Card className="lg:col-span-2 border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
+                <CardHeader>
+                  <CardTitle className="text-xl">Recent Instagram Posts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {mediaData.length > 0 ? (
+                      mediaData.map((post, index) => {
+                        const postDate = new Date(post.timestamp);
+                        const daysAgo = Math.floor((Date.now() - postDate.getTime()) / (1000 * 60 * 60 * 24));
+                        const dateLabel = daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`;
+                        const postEngagement = (post.like_count || 0) + (post.comments_count || 0);
+                        const estimatedRevenue = Math.round(postEngagement * 0.01);
+                        
+                        return (
+                          <div key={post.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-all duration-300 hover:scale-[1.02] animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {post.media_type === 'VIDEO' ? 'Video Post' : 'Photo Post'}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                Instagram · {dateLabel}
+                              </span>
+                              <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Heart className="h-3 w-3" /> {formatCount(post.like_count || 0)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <MessageCircle className="h-3 w-3" /> {formatCount(post.comments_count || 0)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Eye className="h-3 w-3" /> {formatCount(post.impressions || 0)}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-lg font-bold text-green-500">{formatNumber(estimatedRevenue)}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No recent posts found</p>
+                    )}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
+                <CardHeader>
+                  <CardTitle className="text-xl">Instagram Metrics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { source: "Impressions", value: instagramData?.impressions || 0, icon: Eye },
+                    { source: "Reach", value: instagramData?.reach || 0, icon: TrendingUp },
+                    { source: "Engagement", value: instagramData?.engagement || 0, icon: Heart },
+                    { source: "Profile Views", value: instagramData?.profileViews || 0, icon: Users },
+                  ].map((item, index) => {
+                    const maxValue = Math.max(
+                      instagramData?.impressions || 0,
+                      instagramData?.reach || 0,
+                      instagramData?.engagement || 0,
+                      instagramData?.profileViews || 0
+                    );
+                    const percentage = maxValue > 0 ? Math.round((item.value / maxValue) * 100) : 0;
+                    
+                    return (
+                      <div key={index} className="space-y-2 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+                        <div className="flex justify-between text-sm items-center">
+                          <div className="flex items-center gap-2">
+                            <item.icon className="h-4 w-4 text-primary" />
+                            <span className="font-medium">{item.source}</span>
+                          </div>
+                          <span className="text-muted-foreground">{percentage}%</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-700 hover:scale-105"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground">{formatCount(item.value)}</div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </main>
     </div>
