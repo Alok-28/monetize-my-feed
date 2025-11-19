@@ -14,13 +14,16 @@ interface UploadedFile {
   uploadedAt: Date;
 }
 
+const WEBHOOK_URL = "http://localhost:5678/webhook/4700b78a-8cd8-4e77-a65c-fe473adddfba";
+
 const UploadContent = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [description, setDescription] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isWebhookLoading, setIsWebhookLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFileUpload = (selectedFiles: FileList | null) => {
+  const handleFileUpload = async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
     const newFiles: UploadedFile[] = Array.from(selectedFiles).map((file) => ({
@@ -34,6 +37,36 @@ const UploadContent = () => {
     setFiles([...files, ...newFiles]);
     setDescription("");
     toast.success(`${newFiles.length} file(s) uploaded successfully!`);
+
+    // Send to n8n webhook (POST) as multipart/form-data (all files in one request)
+    setIsWebhookLoading(true);
+    try {
+      const formData = new FormData();
+      Array.from(selectedFiles).forEach((file, idx) => {
+        formData.append(`data${idx}`, file); // n8n expects data0, data1, ...
+        formData.append(`name${idx}`, file.name);
+        formData.append(`size${idx}`, file.size.toString());
+        formData.append(`description${idx}`, description);
+        formData.append(`uploadedAt${idx}`, new Date().toISOString());
+      });
+      formData.append("fileCount", selectedFiles.length.toString());
+
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
+      }
+
+      toast.success("Content sent to n8n workflow!");
+    } catch (error) {
+      console.error("Error sending to n8n webhook:", error);
+      toast.error("Failed to send to n8n workflow");
+    } finally {
+      setIsWebhookLoading(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -103,10 +136,11 @@ const UploadContent = () => {
             <Button
               variant="outline"
               className="cursor-pointer"
+              disabled={isWebhookLoading}
               onClick={() => fileInputRef.current?.click()}
               type="button"
             >
-              Choose Files
+              {isWebhookLoading ? "Processing..." : "Choose Files"}
             </Button>
           </div>
 
