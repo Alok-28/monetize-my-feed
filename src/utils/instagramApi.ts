@@ -20,6 +20,9 @@ export interface InstagramMediaInsights {
   shares?: number;
   views?: number;
   timestamp: string;
+  hour?: number;
+  dayOfWeek?: string;
+  date?: string;
 }
 
 export interface InstagramAccountInfo {
@@ -188,6 +191,13 @@ export async function getInstagramMedia(
           // Calculate engagement as likes + comments
           const engagement = (media.like_count || 0) + (media.comments_count || 0);
 
+          // Parse timestamp for time-based analytics
+          const postDate = new Date(media.timestamp);
+          const hour = postDate.getHours();
+          const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const dayOfWeek = dayNames[postDate.getDay()];
+          const date = postDate.toLocaleDateString();
+
           return {
             id: media.id,
             media_type: media.media_type,
@@ -198,7 +208,10 @@ export async function getInstagramMedia(
             saved: insights.saved || 0,
             shares: insights.shares || 0,
             views: insights.views || 0,
-            timestamp: media.timestamp
+            timestamp: media.timestamp,
+            hour,
+            dayOfWeek,
+            date
           };
         }
       } catch (error) {
@@ -206,6 +219,12 @@ export async function getInstagramMedia(
       }
 
       // Return basic data if insights fail
+      const postDate = new Date(media.timestamp);
+      const hour = postDate.getHours();
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayOfWeek = dayNames[postDate.getDay()];
+      const date = postDate.toLocaleDateString();
+
       return {
         id: media.id,
         media_type: media.media_type,
@@ -214,7 +233,10 @@ export async function getInstagramMedia(
         impressions: 0,
         reach: 0,
         saved: 0,
-        timestamp: media.timestamp
+        timestamp: media.timestamp,
+        hour,
+        dayOfWeek,
+        date
       };
     })
   );
