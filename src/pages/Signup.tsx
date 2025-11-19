@@ -5,18 +5,68 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const signupSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+  email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(72, "Password too long"),
+});
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual authentication
-    console.log("Signup attempt:", { name, email, password });
-    navigate("/dashboard");
+    setLoading(true);
+
+    try {
+      const validated = signupSchema.parse({ name, email, password });
+      
+      const { error } = await supabase.auth.signUp({
+        email: validated.email,
+        password: validated.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+          data: {
+            full_name: validated.name,
+          },
+        },
+      });
+
+      if (error) {
+        toast({
+          title: "Signup failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Account created!",
+        description: "Welcome to AutoMonetize AI",
+      });
+      
+      navigate("/dashboard");
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,8 +117,13 @@ const Signup = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 hover:scale-[1.02] shadow-lg" style={{ boxShadow: 'var(--shadow-glow)' }}>
-              Create Account
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 hover:scale-[1.02] shadow-lg" 
+              style={{ boxShadow: 'var(--shadow-glow)' }}
+              disabled={loading}
+            >
+              {loading ? "Creating Account..." : "Create Account"}
             </Button>
             <div className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
