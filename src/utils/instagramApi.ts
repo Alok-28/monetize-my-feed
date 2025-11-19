@@ -31,17 +31,41 @@ export interface InstagramAccountInfo {
   follows_count: number;
 }
 
+export interface ThreadsInsights {
+  threads_followers: number;
+  threads_likes: number;
+  threads_replies: number;
+  threads_views: number;
+  threads_clicks: number;
+  threads_reposts: number;
+}
+
 /**
  * Get Instagram Business Account information
  */
 export async function getInstagramAccountInfo(accessToken: string): Promise<InstagramAccountInfo> {
+  // Validate token format
+  if (!accessToken || accessToken.trim().length === 0) {
+    throw new Error('Instagram access token is missing. Please provide a valid access token.');
+  }
+
   const response = await fetch(
     `https://graph.instagram.com/me?fields=id,username,account_type,media_count,followers_count,follows_count&access_token=${accessToken}`
   );
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Instagram API error: ${response.status} ${JSON.stringify(error)}`);
+    
+    // Handle specific OAuth errors
+    if (error.error?.code === 190 || error.error?.type === 'OAuthException') {
+      if (error.error?.message?.includes('Cannot parse access token') || 
+          error.error?.message?.includes('Invalid OAuth access token')) {
+        throw new Error('Invalid or expired Instagram access token. Please generate a new access token from Facebook Developer Console.');
+      }
+      throw new Error(`OAuth Error: ${error.error.message || 'Invalid access token. Please check your token and try again.'}`);
+    }
+    
+    throw new Error(`Instagram API error: ${response.status} - ${error.error?.message || JSON.stringify(error)}`);
   }
 
   return await response.json();
@@ -74,7 +98,17 @@ export async function getInstagramInsights(
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Instagram API error: ${response.status} ${JSON.stringify(error)}`);
+    
+    // Handle specific OAuth errors
+    if (error.error?.code === 190 || error.error?.type === 'OAuthException') {
+      if (error.error?.message?.includes('Cannot parse access token') || 
+          error.error?.message?.includes('Invalid OAuth access token')) {
+        throw new Error('Invalid or expired Instagram access token. Please generate a new access token from Facebook Developer Console.');
+      }
+      throw new Error(`OAuth Error: ${error.error.message || 'Invalid access token. Please check your token and try again.'}`);
+    }
+    
+    throw new Error(`Instagram API error: ${response.status} - ${error.error?.message || JSON.stringify(error)}`);
   }
 
   const data = await response.json();
@@ -186,6 +220,74 @@ export async function getInstagramMedia(
   );
 
   return mediaWithInsights;
+}
+
+/**
+ * Get Threads analytics/metrics
+ */
+export async function getThreadsInsights(
+  accessToken: string,
+  accountId: string
+): Promise<ThreadsInsights> {
+  // Get Threads insights for the last 30 days using valid Threads metrics
+  const metrics = [
+    'threads_followers',
+    'threads_likes',
+    'threads_replies',
+    'threads_views',
+    'threads_clicks',
+    'threads_reposts'
+  ].join(',');
+
+  const period = 'day';
+  const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000); // 30 days ago
+  const until = Math.floor(Date.now() / 1000); // now
+
+  const response = await fetch(
+    `https://graph.instagram.com/${accountId}/insights?metric=${metrics}&period=${period}&since=${since}&until=${until}&access_token=${accessToken}`
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.error('Threads API Error:', error);
+    // If Threads metrics are not available (account not connected to Threads), return zeros
+    if (response.status === 400) {
+      console.warn('Threads metrics not available - account may not be connected to Threads');
+      console.warn('Error details:', JSON.stringify(error, null, 2));
+      return {
+        threads_followers: 0,
+        threads_likes: 0,
+        threads_replies: 0,
+        threads_views: 0,
+        threads_clicks: 0,
+        threads_reposts: 0,
+      };
+    }
+    throw new Error(`Instagram API error: ${response.status} ${JSON.stringify(error)}`);
+  }
+
+  const data = await response.json();
+  
+  // Aggregate the daily data
+  const aggregated: Partial<ThreadsInsights> = {
+    threads_followers: 0,
+    threads_likes: 0,
+    threads_replies: 0,
+    threads_views: 0,
+    threads_clicks: 0,
+    threads_reposts: 0,
+  };
+  
+  if (data.data && Array.isArray(data.data)) {
+    data.data.forEach((item: { name: string; values: Array<{ value: number }> }) => {
+      const total = item.values.reduce((sum, val) => sum + (val.value || 0), 0);
+      if (item.name in aggregated) {
+        aggregated[item.name as keyof ThreadsInsights] = total;
+      }
+    });
+  }
+
+  return aggregated as ThreadsInsights;
 }
 
 /**

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { getInstagramAnalytics } from "@/utils/instagramApi";
 
-const INSTAGRAM_ACCESS_TOKEN = "IGAAqizzrqLQFBZAFJMcktiemtiVnJ5UU5tUWRIa3UxNFRNcGlfTnhzUXpZAVFZAkTHJudHdPWHVsUlVtNDBJR1lLckFlUkZATOUsyaURleWtqQ2FPUENSN1VzYmppR0pqTThrTzV0VnBnNGhHZAnN4SDQza3h0Ymw0bW1ubk9Pa3RBdwZDZD";
+const INSTAGRAM_ACCESS_TOKEN = "IGAAqizzrqLQFBZAFI4QW1aUFdvd0xNaTZAFT1J3ZAm5WUk1xVi02cjFVUWNNeXdCUTdsbzdObGpGVmtldkZAQeGxMU1VpUE9aT09JcUgwck9wMVNYbjFjM011QlFQTnp2akFsTU00aGZAaX1B1YWpLNEJuMlFuMm8zUmV0eFM3YU1DUQZDZD";
 
 interface InstagramStats {
   followers: number;
@@ -71,7 +71,9 @@ const Monetize = () => {
         setMediaData(analytics.media.slice(0, 5));
       } catch (err: any) {
         console.error("Error fetching Instagram data:", err);
-        setError(err.message || "Failed to fetch Instagram analytics");
+        const errorMessage = err.message || "Failed to fetch Instagram analytics";
+        setError(errorMessage);
+        
         // Set default values on error
         setInstagramData({
           followers: 0,
@@ -182,9 +184,28 @@ const Monetize = () => {
           )}
 
           {error && (
-            <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-              <CardContent className="p-6 text-center">
-                <p className="text-destructive">Error: {error}</p>
+            <Card className="border-destructive/50" style={{ boxShadow: 'var(--shadow-card)' }}>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  <p className="text-destructive font-semibold">Error: {error}</p>
+                  {error.includes('Invalid or expired') || error.includes('OAuth') ? (
+                    <div className="text-sm text-muted-foreground space-y-2 bg-muted/50 p-4 rounded-lg">
+                      <p className="font-medium">How to fix:</p>
+                      <ol className="list-decimal list-inside space-y-1 ml-2">
+                        <li>Go to <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Facebook Developer Console</a></li>
+                        <li>Select your app and go to Tools → Graph API Explorer</li>
+                        <li>Generate a new User Access Token with the following permissions:
+                          <ul className="list-disc list-inside ml-4 mt-1">
+                            <li>instagram_basic</li>
+                            <li>instagram_manage_insights</li>
+                            <li>pages_read_engagement</li>
+                          </ul>
+                        </li>
+                        <li>Copy the new access token and update it in the code</li>
+                      </ol>
+                    </div>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
           )}
