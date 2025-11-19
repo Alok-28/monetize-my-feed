@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, File, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface UploadedFile {
@@ -18,8 +19,24 @@ const UploadContent = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [description, setDescription] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [isWebhookLoading, setIsWebhookLoading] = useState(false);
 
-  const handleFileUpload = (selectedFiles: FileList | null) => {
+  // Load webhook URL from localStorage
+  useEffect(() => {
+    const savedWebhook = localStorage.getItem("n8n_webhook_url");
+    if (savedWebhook) {
+      setWebhookUrl(savedWebhook);
+    }
+  }, []);
+
+  // Save webhook URL to localStorage
+  const handleWebhookUrlChange = (url: string) => {
+    setWebhookUrl(url);
+    localStorage.setItem("n8n_webhook_url", url);
+  };
+
+  const handleFileUpload = async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
     const newFiles: UploadedFile[] = Array.from(selectedFiles).map((file) => ({
@@ -33,6 +50,38 @@ const UploadContent = () => {
     setFiles([...files, ...newFiles]);
     setDescription("");
     toast.success(`${newFiles.length} file(s) uploaded successfully!`);
+
+    // Send to n8n webhook if configured
+    if (webhookUrl) {
+      setIsWebhookLoading(true);
+      try {
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          mode: "no-cors",
+          body: JSON.stringify({
+            files: newFiles.map(f => ({
+              id: f.id,
+              name: f.name,
+              size: f.size,
+              description: f.description,
+              uploadedAt: f.uploadedAt.toISOString(),
+            })),
+            timestamp: new Date().toISOString(),
+            source: "content-upload",
+          }),
+        });
+        
+        toast.success("Content sent to n8n workflow!");
+      } catch (error) {
+        console.error("Error sending to n8n webhook:", error);
+        toast.error("Failed to send to n8n workflow");
+      } finally {
+        setIsWebhookLoading(false);
+      }
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -75,6 +124,23 @@ const UploadContent = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label htmlFor="webhook-url" className="text-sm font-medium">
+              n8n Webhook URL
+            </Label>
+            <Input
+              id="webhook-url"
+              type="url"
+              placeholder="https://your-n8n-instance.com/webhook/..."
+              value={webhookUrl}
+              onChange={(e) => handleWebhookUrlChange(e.target.value)}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Uploads will automatically trigger your n8n workflow when configured
+            </p>
+          </div>
+
           <div
             className={`border-2 border-dashed rounded-lg p-12 text-center transition-all duration-300 ${
               isDragging
@@ -98,8 +164,13 @@ const UploadContent = () => {
               id="file-upload"
             />
             <label htmlFor="file-upload">
-              <Button variant="outline" className="cursor-pointer" asChild>
-                <span>Choose Files</span>
+              <Button 
+                variant="outline" 
+                className="cursor-pointer" 
+                disabled={isWebhookLoading}
+                asChild
+              >
+                <span>{isWebhookLoading ? "Processing..." : "Choose Files"}</span>
               </Button>
             </label>
           </div>
