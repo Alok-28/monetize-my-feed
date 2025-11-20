@@ -19,6 +19,7 @@ export interface InstagramMediaInsights {
   saved: number;
   shares?: number;
   views?: number;
+  permalink?: string;
   timestamp: string;
 }
 
@@ -145,7 +146,7 @@ export async function getInstagramMedia(
 ): Promise<InstagramMediaInsights[]> {
   // First get media list
   const mediaResponse = await fetch(
-    `https://graph.instagram.com/${accountId}/media?fields=id,media_type,like_count,comments_count,timestamp&limit=${limit}&access_token=${accessToken}`
+    `https://graph.instagram.com/${accountId}/media?fields=id,media_type,like_count,comments_count,timestamp,permalink&limit=${limit}&access_token=${accessToken}`
   );
 
   if (!mediaResponse.ok) {
@@ -198,6 +199,7 @@ export async function getInstagramMedia(
             saved: insights.saved || 0,
             shares: insights.shares || 0,
             views: insights.views || 0,
+            permalink: media.permalink,
             timestamp: media.timestamp
           };
         }
@@ -214,6 +216,7 @@ export async function getInstagramMedia(
         impressions: 0,
         reach: 0,
         saved: 0,
+        permalink: media.permalink,
         timestamp: media.timestamp
       };
     })

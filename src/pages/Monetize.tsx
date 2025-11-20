@@ -1,6 +1,6 @@
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Users, Eye, Heart, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -140,6 +140,16 @@ const Monetize = () => {
     },
   ];
 
+  const postAnalyticsData = mediaData.map((post) => {
+    const postDate = new Date(post.timestamp);
+    return {
+      label: postDate.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      likes: post.like_count || 0,
+      views: post.views ?? post.impressions ?? post.reach ?? 0,
+      comments: post.comments_count || 0,
+    };
+  });
+
   return (
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
@@ -265,6 +275,48 @@ const Monetize = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {mediaData.length > 0 && (
+                <Card className="border-border animate-fade-up" style={{ boxShadow: 'var(--shadow-card)' }}>
+                  <CardHeader>
+                    <CardTitle className="text-xl">Real-Time Likes & Views</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={postAnalyticsData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="label" className="text-xs" />
+                        <YAxis className="text-xs" tickFormatter={(value) => formatCount(value as number)} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          formatter={(value, name) => {
+                            const friendlyName = name === 'likes' ? 'Likes' : 'Views';
+                            return [formatCount((value as number) || 0), friendlyName];
+                          }}
+                          labelFormatter={(label) => `Posted ${label}`}
+                        />
+                        <Legend />
+                        <Line 
+                          type="monotone"
+                          dataKey="likes"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: "hsl(var(--primary))" }}
+                          name="Likes"
+                        />
+                        <Line 
+                          type="monotone"
+                          dataKey="views"
+                          stroke="hsl(var(--accent))"
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: "hsl(var(--accent))" }}
+                          name="Views"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
             </>
           )}
 
@@ -272,17 +324,25 @@ const Monetize = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fade-up">
               <Card className="lg:col-span-2 border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
                 <CardHeader>
-                  <CardTitle className="text-xl">Recent Instagram Posts</CardTitle>
+                  <CardTitle className="text-xl">Recent Instagram Posts · Real-Time Analytics</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {mediaData.length > 0 ? (
                       mediaData.map((post, index) => {
                         const postDate = new Date(post.timestamp);
+                        const formattedDate = postDate.toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        });
+                        const formattedTime = postDate.toLocaleTimeString(undefined, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
                         const daysAgo = Math.floor((Date.now() - postDate.getTime()) / (1000 * 60 * 60 * 24));
                         const dateLabel = daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`;
-                        const postEngagement = (post.like_count || 0) + (post.comments_count || 0);
-                        const estimatedRevenue = Math.round(postEngagement * 0.01);
+                        const viewCount = post.views ?? post.impressions ?? post.reach ?? 0;
                         
                         return (
                           <div key={post.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-all duration-300 hover:scale-[1.02] animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
@@ -293,6 +353,9 @@ const Monetize = () => {
                               <span className="text-sm text-muted-foreground">
                                 Instagram · {dateLabel}
                               </span>
+                              <span className="text-xs text-muted-foreground">
+                                Posted on {formattedDate} at {formattedTime}
+                              </span>
                               <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Heart className="h-3 w-3" /> {formatCount(post.like_count || 0)}
@@ -301,11 +364,22 @@ const Monetize = () => {
                                   <MessageCircle className="h-3 w-3" /> {formatCount(post.comments_count || 0)}
                                 </span>
                                 <span className="flex items-center gap-1">
-                                  <Eye className="h-3 w-3" /> {formatCount(post.impressions || 0)}
+                                  <Eye className="h-3 w-3" /> {formatCount(viewCount)}
                                 </span>
                               </div>
                             </div>
-                            <span className="text-lg font-bold text-green-500">{formatNumber(estimatedRevenue)}</span>
+                            {post.permalink ? (
+                              <a 
+                                href={post.permalink} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-sm font-semibold text-primary hover:underline"
+                              >
+                                View Post
+                              </a>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Link unavailable</span>
+                            )}
                           </div>
                         );
                       })
