@@ -1,32 +1,181 @@
 import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import UploadContent from "@/components/UploadContent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Users, TrendingUp, Heart, Eye } from "lucide-react";
+import { Users, TrendingUp, Heart, Eye, Settings, Link as LinkIcon, Twitter, Youtube, Instagram } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const chartData = [
-  { name: "Mon", value: 2400 },
-  { name: "Tue", value: 1398 },
-  { name: "Wed", value: 9800 },
-  { name: "Thu", value: 3908 },
-  { name: "Fri", value: 4800 },
-  { name: "Sat", value: 3800 },
-  { name: "Sun", value: 4300 },
-];
+const platformIcons = {
+  "X (Twitter)": Twitter,
+  "YouTube": Youtube,
+  "Instagram": Instagram,
+  "Threads": LinkIcon,
+};
+
+const platformColors = {
+  "X (Twitter)": "bg-blue-400",
+  "YouTube": "bg-red-600",
+  "Instagram": "bg-gradient-to-r from-purple-500 to-pink-500",
+  "Threads": "bg-gray-800",
+};
+
+interface SocialAccount {
+  id: string;
+  platform: string;
+  username: string;
+  connected: boolean;
+}
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "overview";
-  
-  const stats = [
-    { title: "Total Followers", value: "124.5K", change: "+12.5%", icon: Users, color: "from-blue-500 to-cyan-500" },
-    { title: "Engagement Rate", value: "8.4%", change: "+2.1%", icon: Heart, color: "from-pink-500 to-rose-500" },
-    { title: "Total Reach", value: "2.4M", change: "+18.2%", icon: Eye, color: "from-purple-500 to-indigo-500" },
-    { title: "Growth", value: "+15.2K", change: "+24.3%", icon: TrendingUp, color: "from-green-500 to-emerald-500" },
-  ];
+  const activeTab = searchParams.get("tab") || "upload";
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newPlatform, setNewPlatform] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const { toast } = useToast();
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      if (user) {
+        fetchAccounts(user.id);
+      }
+    };
+    fetchUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchAccounts(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchAccounts = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching accounts:', error);
+      return;
+    }
+
+    setAccounts(data || []);
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('social-accounts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'social_accounts',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setAccounts((prev) => [...prev, payload.new as SocialAccount]);
+          } else if (payload.eventType === 'UPDATE') {
+            setAccounts((prev) =>
+              prev.map((acc) => (acc.id === payload.new.id ? payload.new as SocialAccount : acc))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setAccounts((prev) => prev.filter((acc) => acc.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const handleAddAccount = async () => {
+    if (!user || !newPlatform || !newUsername) {
+      toast({
+        title: "Missing information",
+        description: "Please select a platform and enter a username",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('social_accounts')
+      .insert({
+        user_id: user.id,
+        platform: newPlatform,
+        username: newUsername,
+        connected: true
+      });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add account: " + error.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    toast({
+      title: "Success",
+      description: "Account connected successfully"
+    });
+
+    setIsDialogOpen(false);
+    setNewPlatform("");
+    setNewUsername("");
+  };
+
+  const handleToggleConnection = async (accountId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('social_accounts')
+      .update({ connected: !currentStatus })
+      .eq('id', accountId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update account status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteAccount = async (accountId: string) => {
+    const { error } = await supabase
+      .from('social_accounts')
+      .delete()
+      .eq('id', accountId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete account",
+        variant: "destructive"
+      });
+    }
+  };
+  
   return (
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
@@ -43,103 +192,126 @@ const Dashboard = () => {
               <TabsTrigger value="upload" className="transition-all duration-300">Upload Content</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="overview" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-up">
-                {stats.map((stat, index) => (
-                  <Card key={index} className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:scale-105 border-border" style={{ boxShadow: 'var(--shadow-card)', animationDelay: `${index * 100}ms` }}>
-                    <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-10 transition-opacity`} />
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        {stat.title}
-                      </CardTitle>
-                      <stat.icon className="h-5 w-5 text-muted-foreground group-hover:scale-110 transition-transform" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stat.value}</div>
-                      <p className="text-xs text-green-500 mt-1">
-                        {stat.change} from last week
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <Card className="animate-fade-up border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-                <CardHeader>
-                  <CardTitle className="text-xl">Weekly Engagement</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="name" className="text-xs" />
-                      <YAxis className="text-xs" />
-                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="hsl(var(--primary))" 
-                        fillOpacity={1} 
-                        fill="url(#colorValue)" 
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-up">
-                <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-                  <CardHeader>
-                    <CardTitle className="text-xl">Platform Overview</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {[
-                      { platform: "Instagram", followers: "45.2K", color: "bg-gradient-to-r from-purple-500 to-pink-500" },
-                      { platform: "Twitter", followers: "38.1K", color: "bg-blue-400" },
-                      { platform: "Facebook", followers: "28.9K", color: "bg-blue-600" },
-                      { platform: "TikTok", followers: "12.3K", color: "bg-gray-800" },
-                    ].map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-all duration-300 hover:scale-[1.02] animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg ${item.color} shadow-md`} />
-                          <span className="font-medium">{item.platform}</span>
-                        </div>
-                        <span className="text-sm font-semibold">{item.followers}</span>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border" style={{ boxShadow: 'var(--shadow-card)' }}>
-                  <CardHeader>
-                    <CardTitle className="text-xl">Recent Activity</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {[
-                      { action: "New follower on Instagram", time: "2 minutes ago" },
-                      { action: "Post reached 10K views", time: "1 hour ago" },
-                      { action: "Comment on your TikTok", time: "3 hours ago" },
-                      { action: "Shared your content", time: "5 hours ago" },
-                    ].map((item, index) => (
-                      <div key={index} className="flex flex-col gap-1 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-all duration-300 hover:scale-[1.02] animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                        <span className="text-sm font-medium">{item.action}</span>
-                        <span className="text-xs text-muted-foreground">{item.time}</span>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
             <TabsContent value="upload">
               <UploadContent />
+            </TabsContent>
+
+            <TabsContent value="profile" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* User Profile Card */}
+                <Card className="lg:col-span-1 border-border animate-fade-up">
+                  <CardContent className="p-6 text-center">
+                    <div className="mx-auto h-24 w-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                      <Users className="h-12 w-12 text-primary" />
+                    </div>
+                    <h2 className="text-2xl font-bold">{user?.user_metadata?.full_name || "User"}</h2>
+                    <p className="text-muted-foreground mb-4">{user?.email || "@username"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Content creator focusing on design, tech, and social media trends.
+                    </p>
+                    <div className="mt-4">
+                      <Button variant="outline" className="w-full">Edit Profile</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Connected Accounts List */}
+                <Card className="lg:col-span-2 border-border animate-fade-up">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-xl">Connected Social Accounts</CardTitle>
+                    <Settings className="h-5 w-5 text-muted-foreground cursor-pointer hover:text-primary transition-colors" />
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {accounts.map((account, index) => {
+                      const Icon = platformIcons[account.platform as keyof typeof platformIcons] || LinkIcon;
+                      const color = platformColors[account.platform as keyof typeof platformColors] || "bg-gray-500";
+                      
+                      return (
+                        <div key={account.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-all duration-300 animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color} shadow-md text-white`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <span className="font-medium block">{account.platform}</span>
+                              <span className="text-sm text-muted-foreground">{account.username}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={account.connected ? "default" : "destructive"}>
+                              {account.connected ? 'Connected' : 'Disconnected'}
+                            </Badge>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleToggleConnection(account.id, account.connected)}
+                            >
+                              {account.connected ? 'Disconnect' : 'Reconnect'}
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDeleteAccount(account.id)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {accounts.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No social accounts connected yet. Click below to add one.
+                      </div>
+                    )}
+                    <div className="pt-4">
+                      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" className="w-full">Link New Account</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Add Social Account</DialogTitle>
+                            <DialogDescription>
+                              Connect a new social media account to your profile
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="platform">Platform</Label>
+                              <Select value={newPlatform} onValueChange={setNewPlatform}>
+                                <SelectTrigger id="platform">
+                                  <SelectValue placeholder="Select a platform" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="X (Twitter)">X (Twitter)</SelectItem>
+                                  <SelectItem value="YouTube">YouTube</SelectItem>
+                                  <SelectItem value="Instagram">Instagram</SelectItem>
+                                  <SelectItem value="Threads">Threads</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="username">Username</Label>
+                              <Input
+                                id="username"
+                                placeholder="@yourusername"
+                                value={newUsername}
+                                onChange={(e) => setNewUsername(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                            <Button onClick={handleAddAccount}>Add Account</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
