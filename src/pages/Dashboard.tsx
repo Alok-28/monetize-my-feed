@@ -80,7 +80,10 @@ const Dashboard = () => {
                       </div>
                     ))}
                     <div className="pt-4">
-                      <button className="w-full py-2 px-4 border border-border rounded-md text-sm font-medium hover:bg-muted transition-colors">
+                      <button 
+                        onClick={() => window.location.href = 'https://my.blotato.com/settings'}
+                        className="w-full py-2 px-4 border border-border rounded-md text-sm font-medium hover:bg-muted transition-colors"
+                      >
                         Link New Account
                       </button>
                     </div>

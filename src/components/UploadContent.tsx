@@ -173,7 +173,7 @@ const UploadContent = () => {
             </CardTitle>
           </div>
           <CardDescription className="text-base">
-            Discover and manage your video content with Blotato's powerful platform
+            Start your video generation with Blotato
           </CardDescription>
         </CardHeader>
         
@@ -187,10 +187,10 @@ const UploadContent = () => {
             </div>
             
             <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Your Video Hub Awaits
+              Start Your Video Generation
             </h3>
             <p className="text-sm text-muted-foreground text-center mb-6 max-w-md">
-              Access your video library, manage content, and unlock new monetization opportunities with Blotato's intuitive platform.
+              Create stunning videos with Blotato's powerful AI-powered video generation platform. Transform your ideas into engaging content.
             </p>
             
             <Button
@@ -200,7 +200,7 @@ const UploadContent = () => {
               size="lg"
             >
               <span className="relative z-10 flex items-center gap-2">
-                <span>Visit Blotato</span>
+                <span>Start with Blotato</span>
                 <ExternalLink className="h-4 w-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform duration-300" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-accent to-primary opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300" />
